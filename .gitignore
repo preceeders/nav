@@ -30,5 +30,6 @@ secrets.properties
 .vscode/
 .cursor/
 
+docs/
 # OS
 Thumbs.db

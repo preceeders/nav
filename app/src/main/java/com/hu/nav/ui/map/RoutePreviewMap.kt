@@ -26,6 +26,7 @@ import com.amap.api.maps.model.LatLngBounds
 import com.amap.api.maps.model.MarkerOptions
 import com.amap.api.maps.model.PolylineOptions
 import com.hu.nav.domain.model.GeoPoint
+import com.hu.nav.domain.model.TransitKind
 import com.hu.nav.domain.model.WalkPath
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -183,24 +184,45 @@ private fun drawRoutes(
     map.clear()
     val previewPoints = mutableListOf<LatLng>()
     paths.forEachIndexed { index, path ->
-        val points = pathLatLngs(path, origin, destination)
-        if (points.size < 2) return@forEachIndexed
         val selected = index == selectedIndex
-        if (selected) previewPoints += points
         val focusing = selected && focusedPolyline.size >= 2
-        map.addPolyline(
-            PolylineOptions()
-                .addAll(points)
-                .width(if (selected) 18f else 10f)
-                .color(
-                    when {
-                        focusing -> Color.parseColor("#81C784")
-                        selected -> Color.parseColor("#1B5E20")
-                        else -> Color.parseColor("#889E9E9E")
-                    },
+        if (path.transitSegments.isNotEmpty()) {
+            path.transitSegments.forEach { segment ->
+                val points = segment.polyline.map { LatLng(it.lat, it.lng) }.filter { it.isUsable() }
+                if (points.size < 2) return@forEach
+                if (selected) previewPoints += points
+                map.addPolyline(
+                    PolylineOptions()
+                        .addAll(points)
+                        .width(if (selected) 18f else 10f)
+                        .color(
+                            when {
+                                focusing -> Color.parseColor("#81C784")
+                                selected -> transitColor(segment.kind)
+                                else -> Color.parseColor("#889E9E9E")
+                            },
+                        )
+                        .zIndex(if (selected) 2f else 1f),
                 )
-                .zIndex(if (selected) 2f else 1f),
-        )
+            }
+        } else {
+            val points = pathLatLngs(path, origin, destination)
+            if (points.size < 2) return@forEachIndexed
+            if (selected) previewPoints += points
+            map.addPolyline(
+                PolylineOptions()
+                    .addAll(points)
+                    .width(if (selected) 18f else 10f)
+                    .color(
+                        when {
+                            focusing -> Color.parseColor("#81C784")
+                            selected -> Color.parseColor("#1B5E20")
+                            else -> Color.parseColor("#889E9E9E")
+                        },
+                    )
+                    .zIndex(if (selected) 2f else 1f),
+            )
+        }
     }
     origin?.takeIf { showOriginMarker && it.isValid() }?.let {
         val latLng = LatLng(it.lat, it.lng)
@@ -244,6 +266,18 @@ private fun drawRoutes(
         return boundsOf(focusPoints)
     }
     return boundsOf(previewPoints)
+}
+
+private fun transitColor(kind: TransitKind): Int {
+    return Color.parseColor(
+        when (kind) {
+            TransitKind.Walk -> "#1B5E20"
+            TransitKind.Bus -> "#1565C0"
+            TransitKind.Subway -> "#6A1B9A"
+            TransitKind.Railway -> "#E65100"
+            TransitKind.Taxi -> "#F9A825"
+        },
+    )
 }
 
 private fun pathLatLngs(

@@ -77,4 +77,18 @@ class GeoMathTest {
         assertEquals(3, line.size)
         assertEquals(b, line[1])
     }
+
+    @Test
+    fun remainAlongPolylineShrinksTowardEnd() {
+        val a = GeoPoint(31.2300, 121.4737)
+        val b = GeoPoint(31.2310, 121.4737)
+        val c = GeoPoint(31.2320, 121.4737)
+        val line = listOf(a, b, c)
+        val total = GeoMath.polylineLength(line)
+        val atStart = GeoMath.remainAlongPolyline(a, line)
+        val atMid = GeoMath.remainAlongPolyline(b, line)
+        assertEquals(total, atStart, 1.0)
+        assertTrue("mid=$atMid total=$total", atMid < atStart - 10)
+        assertTrue(GeoMath.remainAlongPolyline(c, line) < 5.0)
+    }
 }

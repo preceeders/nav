@@ -161,6 +161,31 @@ object GeoMath {
         return dirs[index]
     }
 
+    /** 从最近点沿折线走到终点的剩余距离。 */
+    fun remainAlongPolyline(point: GeoPoint, line: List<GeoPoint>): Double {
+        if (line.size < 2) return 0.0
+        var prefix = 0.0
+        var bestDist = Double.POSITIVE_INFINITY
+        var bestTraveled = 0.0
+        var total = 0.0
+        for (i in 0 until line.lastIndex) {
+            total += distanceMeters(line[i], line[i + 1])
+        }
+        for (i in 0 until line.lastIndex) {
+            val a = line[i]
+            val b = line[i + 1]
+            val seg = distanceMeters(a, b)
+            val closest = closestPointOnSegment(point, a, b)
+            val dist = distanceMeters(point, closest)
+            if (dist < bestDist) {
+                bestDist = dist
+                bestTraveled = prefix + distanceMeters(a, closest)
+            }
+            prefix += seg
+        }
+        return (total - bestTraveled).coerceAtLeast(0.0)
+    }
+
     fun distanceToPolyline(point: GeoPoint, line: List<GeoPoint>): Double {
         if (line.isEmpty()) return Double.POSITIVE_INFINITY
         if (line.size == 1) return distanceMeters(point, line.first())

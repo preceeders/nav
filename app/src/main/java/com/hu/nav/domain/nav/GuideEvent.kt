@@ -24,6 +24,7 @@ sealed class GuideEvent {
         val distanceMeters: Int,
     ) : GuideEvent()
     data class Arrived(val destinationName: String) : GuideEvent()
+    data class TransitPrompt(val text: String) : GuideEvent()
 }
 
 enum class WalkingPhase {

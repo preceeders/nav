@@ -21,8 +21,10 @@ object RouteDetailFormatter {
     fun fromSearchSteps(
         steps: List<SearchWalkStep>,
         originAddress: String,
+        includeStart: Boolean = true,
     ): List<RouteGuide> {
-        val guides = mutableListOf(startGuide(originAddress))
+        val guides = mutableListOf<RouteGuide>()
+        if (includeStart) guides += startGuide(originAddress)
         steps.forEachIndexed { index, step ->
             val isLast = index == steps.lastIndex
             val facility = facilityOf(step.roadType, step.assistantAction, step.instruction)

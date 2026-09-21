@@ -95,8 +95,10 @@ fun JourneyScreen(
     }
 
     val path = state.path ?: session.selectedPath
-    val overview = path?.overviewText().orEmpty().ifBlank {
-        "正在导航到${state.destinationName}"
+    val overview = state.hint.ifBlank {
+        path?.overviewText().orEmpty().ifBlank {
+            "正在导航到${state.destinationName}"
+        }
     }
     val headingCue = headingActionText(state)
     val remainText = remainLabel(state.remainMeters, state.remainSeconds)

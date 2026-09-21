@@ -2,6 +2,7 @@ package com.hu.nav.domain.nav
 
 import com.hu.nav.domain.model.GeoPoint
 import com.hu.nav.domain.model.Poi
+import com.hu.nav.domain.model.TravelMode
 import com.hu.nav.domain.model.WalkPath
 
 class NavigationSession {
@@ -11,6 +12,7 @@ class NavigationSession {
     var paths: List<WalkPath> = emptyList()
     var selectedPath: WalkPath? = null
     var lastCity: String = ""
+    var travelMode: TravelMode = TravelMode.Walk
 
     fun clearJourney() {
         selectedPath = null
@@ -24,5 +26,6 @@ class NavigationSession {
         paths = emptyList()
         selectedPath = null
         lastCity = ""
+        travelMode = TravelMode.Walk
     }
 }

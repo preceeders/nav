@@ -30,6 +30,7 @@ class AppContainer(context: Context) {
 
     val engine = NavigationEngine(
         naviClient = navi,
+        locationClient = location,
         compass = compass,
         tts = tts,
         scope = appScope,

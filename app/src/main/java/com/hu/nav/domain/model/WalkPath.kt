@@ -56,6 +56,45 @@ data class RouteGuide(
     val polyline: List<GeoPoint> = emptyList(),
 )
 
+enum class TravelMode {
+    Walk,
+    Transit,
+}
+
+enum class TransitKind {
+    Walk,
+    Bus,
+    Subway,
+    Railway,
+    Taxi,
+}
+
+data class TransitStop(
+    val name: String,
+    val location: GeoPoint? = null,
+)
+
+data class TransitSegment(
+    val kind: TransitKind,
+    val instruction: String,
+    val lineName: String = "",
+    val departure: TransitStop? = null,
+    val arrival: TransitStop? = null,
+    val viaStops: List<TransitStop> = emptyList(),
+    val distanceMeters: Int = 0,
+    val durationSeconds: Int = 0,
+    val polyline: List<GeoPoint> = emptyList(),
+    val walkGuides: List<RouteGuide> = emptyList(),
+) {
+    val isRide: Boolean get() = kind != TransitKind.Walk
+
+    fun allStops(): List<TransitStop> =
+        listOfNotNull(departure) + viaStops + listOfNotNull(arrival)
+
+    fun targetPoint(): GeoPoint? =
+        arrival?.location ?: polyline.lastOrNull()
+}
+
 data class WalkPath(
     val id: Int,
     val distanceMeters: Int,
@@ -65,7 +104,14 @@ data class WalkPath(
     val guides: List<RouteGuide> = emptyList(),
     val originAddress: String = "",
     val sdkTrafficLightCount: Int = 0,
+    val mode: TravelMode = TravelMode.Walk,
+    val costYuan: Float = 0f,
+    val walkDistanceMeters: Int = 0,
+    val transferCount: Int = 0,
+    val lineSummary: String = "",
+    val transitSegments: List<TransitSegment> = emptyList(),
 ) {
+    val isTransit: Boolean get() = mode == TravelMode.Transit
     val displayGuides: List<RouteGuide>
         get() {
             val body = guides.ifEmpty { RouteDetailFormatter.fromNaviLinks(steps) }
@@ -98,19 +144,55 @@ data class WalkPath(
         return "${minutes}分钟"
     }
 
-    fun viaRoadNames(): List<String> =
-        displayGuides.map { it.roadName.trim() }
+    fun viaRoadNames(): List<String> {
+        if (isTransit && lineSummary.isNotBlank()) {
+            return lineSummary.split(" → ").map { it.trim() }.filter { it.isNotBlank() }
+        }
+        return displayGuides.map { it.roadName.trim() }
             .filter { it.isNotBlank() && it != "无名道路" }
             .distinct()
+    }
 
     fun overviewText(): String {
+        if (isTransit) {
+            val via = lineSummary.ifBlank { viaRoadNames().take(3).joinToString("，") }
+            val viaPart = if (via.isNotBlank()) "，乘坐$via" else ""
+            return "公交全程${formatDistance()}$viaPart，${formatDuration()}"
+        }
         val via = viaRoadNames().take(3).joinToString("，")
         val viaPart = if (via.isNotBlank()) "，途经$via" else ""
         return "全程${formatDistance()}$viaPart，${formatDuration()}"
     }
 
-    fun cardStats(): String =
-        "${formatDistance()}  转弯${turnCount}次  红绿灯${trafficLightCount}个"
+    fun cardStats(): String {
+        if (isTransit) {
+            val walk = formatWalkDistance()
+            val transfer = "换乘${transferCount}次"
+            val cost = if (costYuan > 0f) "  ${formatCost()}" else ""
+            return "$walk  $transfer$cost"
+        }
+        return "${formatDistance()}  转弯${turnCount}次  红绿灯${trafficLightCount}个"
+    }
+
+    fun formatWalkDistance(): String {
+        val meters = if (walkDistanceMeters > 0) walkDistanceMeters else {
+            transitSegments.filter { it.kind == TransitKind.Walk }.sumOf { it.distanceMeters }
+        }
+        return if (meters >= 1000) {
+            String.format("步行%.1f公里", meters / 1000.0)
+        } else {
+            "步行${meters}米"
+        }
+    }
+
+    fun formatCost(): String {
+        val value = if (costYuan == costYuan.toInt().toFloat()) {
+            "${costYuan.toInt()}元"
+        } else {
+            String.format("%.1f元", costYuan)
+        }
+        return value
+    }
 
     fun statsLine(): String =
         "${formatDistance()}，${formatDuration()}，转弯${turnCount}次，红绿灯${trafficLightCount}个，过马路${crosswalkCount}次"
@@ -118,6 +200,11 @@ data class WalkPath(
     fun summary(index: Int): String = "方案${index + 1}，${statsLine()}"
 
     fun displayPolyline(): List<GeoPoint> {
+        if (transitSegments.isNotEmpty()) {
+            val merged = mutableListOf<GeoPoint>()
+            transitSegments.forEach { GeoMath.appendPolyline(merged, it.polyline) }
+            if (merged.size >= 2) return merged
+        }
         val fromSteps = steps.flatMap { step -> step.links.flatMap { it.polyline } }
         val fromGuides = guides.flatMap { it.polyline }
         return listOf(polyline, fromSteps, fromGuides).maxBy { it.size }.let { densest ->

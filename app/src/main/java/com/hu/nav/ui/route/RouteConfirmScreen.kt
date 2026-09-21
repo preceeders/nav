@@ -44,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.hu.nav.domain.model.TravelMode
 import com.hu.nav.domain.model.WalkPath
 import com.hu.nav.ui.common.BottomSheetCard
 import com.hu.nav.ui.common.MapOverlayScaffold
@@ -113,13 +114,25 @@ fun RouteConfirmScreen(
                         },
                         backDescription = if (state.showDetails) "返回路线选择" else "返回搜索",
                     )
+                    if (!state.showDetails) {
+                        TravelModeRow(
+                            travelMode = state.travelMode,
+                            onTravelMode = viewModel::setTravelMode,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        )
+                    }
                     when {
                         state.loading -> {
                             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     CircularProgressIndicator(color = NavAccent)
                                     Spacer(Modifier.height(12.dp))
-                                    Text("正在规划步行路线", color = Color(0xFF666666))
+                                    val loadingText = if (state.travelMode == TravelMode.Transit) {
+                                        "正在规划公交路线"
+                                    } else {
+                                        "正在规划步行路线"
+                                    }
+                                    Text(loadingText, color = Color(0xFF666666))
                                 }
                             }
                             SheetActionBar(onDepart = onStart, departEnabled = false)
@@ -156,7 +169,6 @@ fun RouteConfirmScreen(
                                 selectedIndex = state.selectedIndex,
                                 onSelect = viewModel::select,
                                 onOpenDetails = viewModel::openDetails,
-                                onTransitUnavailable = { notice = "公交路线暂未开放，当前仅支持步行导航" },
                                 modifier = Modifier.weight(1f),
                             )
                             SheetActionBar(
@@ -194,22 +206,37 @@ private fun SheetTitle(
 }
 
 @Composable
+private fun TravelModeRow(
+    travelMode: TravelMode,
+    onTravelMode: (TravelMode) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        ModeChip(
+            text = "步行路线",
+            selected = travelMode == TravelMode.Walk,
+            onClick = { onTravelMode(TravelMode.Walk) },
+        )
+        ModeChip(
+            text = "公交路线",
+            selected = travelMode == TravelMode.Transit,
+            onClick = { onTravelMode(TravelMode.Transit) },
+        )
+    }
+}
+
+@Composable
 private fun RoutePickBody(
     paths: List<WalkPath>,
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
     onOpenDetails: (Int) -> Unit,
-    onTransitUnavailable: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.padding(horizontal = 16.dp)) {
-        Row(
-            modifier = Modifier.padding(bottom = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            ModeChip(text = "步行路线", selected = true, onClick = {})
-            ModeChip(text = "公交路线", selected = false, onClick = onTransitUnavailable)
-        }
         LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             itemsIndexed(paths, key = { index, path -> "$index-${path.id}" }) { index, path ->
                 RouteCard(
@@ -230,14 +257,14 @@ private fun ModeChip(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    val desc = if (selected) "$text，已选中" else "$text，暂未开放"
+    val desc = if (selected) "$text，已选中" else "$text，点两下切换"
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(20.dp))
             .background(if (selected) NavMuted else Color.Transparent)
             .then(
                 if (selected) Modifier.border(1.dp, NavStroke, RoundedCornerShape(20.dp))
-                else Modifier,
+                else Modifier.border(1.dp, NavStroke.copy(alpha = 0.5f), RoundedCornerShape(20.dp)),
             )
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 8.dp)
@@ -352,6 +379,7 @@ private fun RouteSummaryBanner(path: WalkPath, index: Int) {
 private val ChineseIndex = listOf("一", "二", "三", "四", "五", "六", "七", "八", "九", "十")
 
 private fun WalkPath.routeTitle(index: Int): String {
+    if (isTransit && lineSummary.isNotBlank()) return lineSummary
     if (index == 0) return "推荐路线"
     val label = ChineseIndex.getOrNull(index) ?: (index + 1).toString()
     return "路线$label"

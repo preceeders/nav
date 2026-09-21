@@ -9,6 +9,7 @@ import com.amap.api.services.geocoder.RegeocodeQuery
 import com.amap.api.services.geocoder.RegeocodeResult
 import com.amap.api.services.poisearch.PoiResult
 import com.amap.api.services.poisearch.PoiSearch
+import com.amap.api.services.route.BusPath
 import com.amap.api.services.route.BusRouteResult
 import com.amap.api.services.route.DriveRouteResult
 import com.amap.api.services.route.RideRouteResult
@@ -21,6 +22,11 @@ import com.hu.nav.domain.model.Poi
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+
+data class ReverseGeo(
+    val address: String,
+    val city: String,
+)
 
 class AMapSearchClient(context: Context) {
     private val app = context.applicationContext
@@ -92,18 +98,63 @@ class AMapSearchClient(context: Context) {
         }
     }
 
-    suspend fun reverseGeocode(point: GeoPoint): String {
+    suspend fun searchBusPaths(from: GeoPoint, to: GeoPoint, city: String, destCity: String = city): List<BusPath> {
+        val queryCity = city.trim()
+        if (queryCity.isBlank()) {
+            throw IllegalStateException("无法确定所在城市，请确认已开启定位后再规划公交")
+        }
+        return suspendCancellableCoroutine { cont ->
+            val fromAndTo = RouteSearch.FromAndTo(
+                LatLonPoint(from.lat, from.lng),
+                LatLonPoint(to.lat, to.lng),
+            )
+            val query = RouteSearch.BusRouteQuery(fromAndTo, RouteSearch.BusDefault, queryCity, 0).apply {
+                val other = destCity.trim()
+                if (other.isNotBlank() && other != queryCity) setCityd(other)
+                runCatching { setExtensions(RouteSearch.EXTENSIONS_ALL) }
+            }
+            val routeSearch = RouteSearch(app)
+            routeSearch.setRouteSearchListener(object : RouteSearch.OnRouteSearchListener {
+                override fun onWalkRouteSearched(result: WalkRouteResult?, errorCode: Int) = Unit
+                override fun onBusRouteSearched(result: BusRouteResult?, errorCode: Int) {
+                    if (!cont.isActive) return
+                    if (errorCode != 1000) {
+                        android.util.Log.e("AMapSearchClient", "bus route error=$errorCode")
+                        cont.resumeWithException(
+                            IllegalStateException(AmapError.routeMessage(errorCode, sha1, app.packageName)),
+                        )
+                        return
+                    }
+                    val paths = result?.paths.orEmpty()
+                    android.util.Log.i("AMapSearchClient", "bus route paths=${paths.size}")
+                    cont.resume(paths)
+                }
+                override fun onDriveRouteSearched(result: DriveRouteResult?, errorCode: Int) = Unit
+                override fun onRideRouteSearched(result: RideRouteResult?, errorCode: Int) = Unit
+            })
+            routeSearch.calculateBusRouteAsyn(query)
+        }
+    }
+
+    suspend fun reverseGeocode(point: GeoPoint): String = reverseGeocodeDetails(point).address
+
+    suspend fun reverseGeocodeDetails(point: GeoPoint): ReverseGeo {
         return suspendCancellableCoroutine { cont ->
             val geocodeSearch = GeocodeSearch(app)
             geocodeSearch.setOnGeocodeSearchListener(object : GeocodeSearch.OnGeocodeSearchListener {
                 override fun onRegeocodeSearched(result: RegeocodeResult?, errorCode: Int) {
                     if (!cont.isActive) return
                     if (errorCode != 1000) {
-                        cont.resume("")
+                        cont.resume(ReverseGeo("", ""))
                         return
                     }
-                    val address = result?.regeocodeAddress?.formatAddress.orEmpty()
-                    cont.resume(address)
+                    val addr = result?.regeocodeAddress
+                    cont.resume(
+                        ReverseGeo(
+                            address = addr?.formatAddress.orEmpty(),
+                            city = addr?.city.orEmpty().ifBlank { addr?.province.orEmpty() },
+                        ),
+                    )
                 }
 
                 override fun onGeocodeSearched(result: GeocodeResult?, errorCode: Int) = Unit
