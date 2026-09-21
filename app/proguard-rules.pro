@@ -1,0 +1,6 @@
+-keep class com.amap.api.** { *; }
+-keep class com.autonavi.** { *; }
+-keep class com.alibaba.fastjson.** { *; }
+-keep class org.locationtech.jts.** { *; }
+-dontwarn com.amap.api.**
+-dontwarn com.autonavi.**

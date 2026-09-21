@@ -1,0 +1,34 @@
+*.iml
+.gradle/
+.idea/
+.DS_Store
+.cxx/
+.externalNativeBuild/
+captures/
+
+# Build outputs
+build/
+app/build/
+*.apk
+*.ap_
+*.aab
+*.dex
+*.class
+
+# Secrets and machine-local config
+local.properties
+secrets.properties
+*.jks
+*.keystore
+*.p12
+*.pem
+*.key
+
+# Logs and IDE
+*.log
+*.swp
+.vscode/
+.cursor/
+
+# OS
+Thumbs.db

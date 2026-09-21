@@ -1,0 +1,14 @@
+## Copy this file to local.properties and fill in your own values.
+## Do not commit local.properties.
+
+sdk.dir=C:\\Users\\YOUR_USER\\AppData\\Local\\Android\\Sdk
+
+## AMap Open Platform Android Key
+## Package name: com.hu.nav
+AMAP_KEY=
+
+## Signing keystore at repo root (debug/release). SHA1 must match the AMap key.
+KEYSTORE_FILE=navi.jks
+KEYSTORE_PASSWORD=
+KEY_ALIAS=
+KEY_PASSWORD=
